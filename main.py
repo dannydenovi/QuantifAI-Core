@@ -23,6 +23,7 @@ if __name__ == "__main__":
     parser.add_argument("--is_classification", action="store_true", help="If the task is classification")
     parser.add_argument("--save_onnx", action="store_true", help="Save model in ONNX format")
     parser.add_argument("--args", nargs=argparse.REMAINDER)
+    parser.add_argument("--test", action="store_true", help="Test saved model")
     args = parser.parse_args()
 
     dynamic_args = parse_dynamic_args(args.args)
@@ -44,7 +45,12 @@ if __name__ == "__main__":
 
     # Quantize model
     quantized_model = quantize_model_fx(model, train_loader, args.num_batches)
-    save(quantized_model.state_dict(), "quantized_model.pth")
+
+    # if test dont save
+    if not args.test:
+        save(quantized_model.state_dict(), "quantized_model.pth")
+        print("Quantized model saved successfully.")
+    quantized_model.load_state_dict(load("quantized_model.pth", map_location=device('cpu')))
 
     # Evaluate quantized model
     print("Quantized Model Metrics:", evaluate_metrics(test_loader, quantized_model, is_classification=is_classification))
