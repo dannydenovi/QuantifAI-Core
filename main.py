@@ -13,7 +13,7 @@ torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if __name__ == "__main__":
 
     quantization_types = ["static", "dynamic"]
-    available_data_types = ["int8", "float32"]
+    available_data_types = ["int8", "float16"]
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--training_set_path", default="training_dataset.pth", help="Path to training dataset")
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     if args.dtype == "int8":
         type = torch.qint8
     else:
-        type = torch.float32
+        type = torch.float16
 
     # Quantize model
     if args.quantization_method == "dynamic":
