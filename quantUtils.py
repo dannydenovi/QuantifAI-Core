@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch.quantization import quantize_fx, QConfig, MinMaxObserver, PerChannelMinMaxObserver
 from torch.ao.quantization.qconfig_mapping import QConfigMapping
+import torch.quantization
 
 
 # Metrics Calculation
@@ -42,7 +43,7 @@ def evaluate_metrics(test_dataloader, model, is_classification=False):
 
 
 # Quantization
-def quantize_model_fx(model, training_dataloader, num_batches=1):
+def quantize_model_fx(model, training_dataloader, num_batches=1, type=torch.qint8):
     """Quantize a model using FX Graph Mode."""
     model.eval()
     qconfig = QConfig(
@@ -57,4 +58,16 @@ def quantize_model_fx(model, training_dataloader, num_batches=1):
         if i >= num_batches - 1:
             break
     return quantize_fx.convert_fx(prepared_model)
+
+
+def quantize_model_dynamic(model, training_dataloader, num_batches=1, type=torch.qint8):
+    """Quantize a model using Dynamic Quantization."""
+    quantized_model = torch.quantization.quantize_dynamic(
+        model,  # Modello da quantizzare
+        {nn.Linear, nn.RNNCell, nn.GRUCell, nn.LSTMCell},  # Tipi di livelli da quantizzare dinamicamente
+        dtype=type # Tipo di quantizzazione (opzionale, default è qint8)
+    )
+
+
+    return quantized_model
 

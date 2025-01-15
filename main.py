@@ -1,16 +1,20 @@
 import os
-from torch import device, cuda, load, save
+import torch
 import argparse
 from torch.utils.data import  DataLoader
 from genericDataset import GenericDataset
-from quantUtils import evaluate_metrics, quantize_model_fx
+from quantUtils import evaluate_metrics, quantize_model_fx, quantize_model_dynamic
 from utils import load_class_from_file, parse_dynamic_args, save_onnx
 
 # Set device
-device("cuda" if cuda.is_available() else "cpu")
+torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Main Script
 if __name__ == "__main__":
+
+    quantization_types = ["static", "dynamic"]
+    available_data_types = ["int8", "float32"]
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--training_set_path", default="training_dataset.pth", help="Path to training dataset")
     parser.add_argument("--test_set_path", default="test_dataset.pth", help="Path to test dataset")
@@ -24,6 +28,8 @@ if __name__ == "__main__":
     parser.add_argument("--save_onnx", action="store_true", help="Save model in ONNX format")
     parser.add_argument("--args", nargs=argparse.REMAINDER)
     parser.add_argument("--test", action="store_true", help="Test saved model")
+    parser.add_argument("--quantization_method", default="static", choices=quantization_types, help="Quantization method")
+    parser.add_argument("--dtype", default="int8", choices=available_data_types, help="Quantization datatype")
     args = parser.parse_args()
 
     dynamic_args = parse_dynamic_args(args.args)
@@ -38,19 +44,28 @@ if __name__ == "__main__":
 
     # Load model
     model = load_class_from_file(args.model_class, os.path.dirname(args.model_file), args.model_file, **dynamic_args)
-    model.load_state_dict(load(args.model_path, map_location=device('cpu')))
+    model.load_state_dict(torch.load(args.model_path, map_location=torch.device('cpu')))
 
     # Evaluate raw model
     print("Raw Model Metrics:", evaluate_metrics(test_loader, model, is_classification=is_classification))
 
+    #Data type
+    if args.dtype == "int8":
+        type = torch.qint8
+    else:
+        type = torch.float32
+
     # Quantize model
-    quantized_model = quantize_model_fx(model, train_loader, args.num_batches)
+    if args.quantization_method == "dynamic":
+        quantized_model = quantize_model_dynamic(model, train_loader, args.num_batches, type=type)
+    else:
+        quantized_model = quantize_model_fx(model, train_loader, args.num_batches, type=type)
 
     # if test dont save
     if not args.test:
-        save(quantized_model.state_dict(), "quantized_model.pth")
+        torch.save(quantized_model.state_dict(), "quantized_model.pth")
         print("Quantized model saved successfully.")
-    quantized_model.load_state_dict(load("quantized_model.pth", map_location=device('cpu')))
+    quantized_model.load_state_dict(torch.load("quantized_model.pth", map_location=torch.device('cpu')))
 
     # Evaluate quantized model
     print("Quantized Model Metrics:", evaluate_metrics(test_loader, quantized_model, is_classification=is_classification))
